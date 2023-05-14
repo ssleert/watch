@@ -3,6 +3,8 @@ CC	?= cc
 CFLAGS	?= -O2
 CFLAGS	+= -Wall -Wextra -std=c99 -pedantic
 #CFLAGS	+= -Wall -Wextra -Werror -std=c99 -pedantic
+#LDFLAGS	+= -ltermcap
+
 
 PREFIX	?= /usr/local
 BINDIR	?= $(PREFIX)/bin
@@ -11,16 +13,16 @@ INSTALL	?= install -s
 
 PROG	= watch
 MAN	= $(PROG).1
-CFILES	= $(PROG).c 
-OBJS	= $(CFILES:.c=.o)
+CFILES	!= ls *.c 
+OBJS	= ${CFILES:.c=.o}
 
 all: $(PROG)
 
 $(PROG): $(OBJS)
-	$(CC) $(OBJS) -o $@
+	$(CC) $(OBJS) -o $@ $(LDFLAGS)
 
 %.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -c $< -o $@ $(LDFLAGS)
 
 install: all
 	mkdir -p $(DESTDIR)$(BINDIR) $(DESTDIR)$(MANDIR)

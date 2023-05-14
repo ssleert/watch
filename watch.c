@@ -4,16 +4,17 @@
 #include <errno.h>
 #include <float.h>
 #include <stdbool.h>
-#include <getopt.h>
+#include <unistd.h>
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#include <sys/wait.h>
+#include <sys/ioctl.h>
 
 #define BUFSIZE 2048
 #define DEFAULT_INTERVAL 2.0
 #define MAX_ARGS 128
 
-#define NAME "watch"
 #define VERSION "0.0.1"
 #define RANGE_CHECK(n) (n < DBL_MAX && n > DBL_MIN)
 
@@ -22,9 +23,15 @@
 	exit(status);                  \
 } while (0)
 
+#define revprint(str) do {                     \
+	printf("\033[%ldD", strlen(str) - 1);  \
+	printf("%s", str);                    \
+} while (0)
 
 static void usage(void);
 static void clear_screen(void);
+static void move_cursor(unsigned short x, unsigned short y);
+static void draw_bar(double interval, const char *cmd);
 static long get_mscs(double secs);
 static void ms_sleep(long ms);
 
@@ -38,16 +45,19 @@ main(int argc, char *argv[])
 
 	char *cmd = NULL;
 	double interval = DEFAULT_INTERVAL;
-	bool notitle = false, halt = false;
+	bool title = true, halt = false, clear = true;
 
 	char ch;
-	while ((ch = getopt(argc, argv, "txn:c:")) != -1) {
+	while ((ch = getopt(argc, argv, "txsn:c:")) != -1) {
 		switch (ch) {
 		case 't':
-			notitle = true;
+			title = false;
 			break;
 		case 'x':
 			halt = true;
+			break;
+		case 's':
+			clear = false;
 			break;
 		case 'n':
 			;char *endptr;
@@ -111,7 +121,7 @@ main(int argc, char *argv[])
 
 		for (int i = index; i < argc; ++i) {
 			if (cmd_size + strlen(argv[i]) + 1 >= cmd_size) {
-				cmd_size = cmd_size * 2;
+				cmd_size *= 2;
 				cmd = realloc(cmd, cmd_size);
 				if (cmd == NULL)
 					error(2,
@@ -124,21 +134,49 @@ main(int argc, char *argv[])
 		}
 	}
 
-	clear_screen();
-	int status = system(cmd);
-	if (halt == true) {
-		do {
-			if (status != 0)
-				return status;
-			ms_sleep(get_mscs(interval));
-			clear_screen();
-			status = system(cmd);
-		} while (true);
-	}
-	while (true) {
-		ms_sleep(get_mscs(interval));
+	if (cmd[0] == '-')
+		error(4,
+		    "args: cmd arg starts with '-'\n");
+	char *cmd_with_sh[4] = {"sh", "-c", cmd, 0};
+
+	
+	if (clear == true) {
 		clear_screen();
-		system(cmd);
+		if (title == true)
+			draw_bar(interval, cmd);
+		fflush(stdout);
+	}
+	pid_t pid;
+	int status;
+	while (true) {
+		switch (pid = fork()) {
+		case -1:
+			perror("fork()");
+			exit(5);
+		case 0:
+			execvp(cmd_with_sh[0], cmd_with_sh);
+		default:
+			if (waitpid(pid, &status, 0) < 0) {
+				perror("waitpid()");
+				exit(5);
+			}
+
+			if (WEXITSTATUS(status) != 0) {
+				fprintf(stderr,
+				    "exit: %d\n\n",
+				    WEXITSTATUS(status));
+				if (halt == true)
+					exit(WEXITSTATUS(status));
+			}
+
+			ms_sleep(get_mscs(interval));
+			if (clear == true) {
+				clear_screen();
+				if (title == true)
+					draw_bar(interval, cmd);
+				fflush(stdout);
+			}
+		}
 	}
 	return 0;
 }
@@ -147,7 +185,7 @@ static void
 usage(void) 
 {
 	fprintf(stderr,
-	    "usage: %s [-txn:c:] -- [command ...]\n",
+	    "usage: %s [-txsn:c:] -- [command ...]\n",
 	    getprogname());
 	exit(1);
 }
@@ -155,7 +193,36 @@ usage(void)
 static void
 clear_screen(void)
 {
-	system("clear");
+	// copied from clear(1) command
+	fprintf(stdout, "\033[2J");
+}
+
+static void
+move_cursor(unsigned short x, unsigned short y)
+{
+	printf("\033[%d;%dH", y, x);
+}
+
+static void
+draw_bar(double interval, const char *str)
+{
+	move_cursor(1, 1);
+
+	printf("Every %.3f: %s", interval, str);
+
+	struct winsize w;
+	ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+	move_cursor(w.ws_col, 1);
+
+	time_t t = time(NULL);
+	struct tm tm = *localtime(&t);
+
+	char time_buf[BUFSIZE];
+	size_t r = strftime(time_buf, BUFSIZE, "%c", &tm);
+	if (r < 1)
+		strlcpy(time_buf, "TIME ERROR", BUFSIZE);
+	revprint(time_buf);
+	move_cursor(1, 2);
 }
 
 static long
