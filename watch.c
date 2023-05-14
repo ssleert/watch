@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdarg.h>
 #include <errno.h>
 #include <float.h>
 #include <stdbool.h>
@@ -8,7 +7,6 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
-#include <sys/wait.h>
 #include <sys/ioctl.h>
 
 #define BUFSIZE 2048
@@ -25,7 +23,7 @@
 
 #define revprint(str) do {                     \
 	printf("\033[%ldD", strlen(str) - 1);  \
-	printf("%s", str);                    \
+	printf("%s", str);                     \
 } while (0)
 
 static void usage(void);
@@ -137,45 +135,29 @@ main(int argc, char *argv[])
 	if (cmd[0] == '-')
 		error(4,
 		    "args: cmd arg starts with '-'\n");
-	char *cmd_with_sh[4] = {"sh", "-c", cmd, 0};
 
-	
 	if (clear == true) {
 		clear_screen();
 		if (title == true)
 			draw_bar(interval, cmd);
 		fflush(stdout);
 	}
-	pid_t pid;
-	int status;
 	while (true) {
-		switch (pid = fork()) {
-		case -1:
-			perror("fork()");
-			exit(5);
-		case 0:
-			execvp(cmd_with_sh[0], cmd_with_sh);
-		default:
-			if (waitpid(pid, &status, 0) < 0) {
-				perror("waitpid()");
-				exit(5);
-			}
+		int status = system(cmd);
+		if (status != 0) {
+			fprintf(stderr,
+			    "exit: %d\n\n",
+			    status);
+			if (halt == true)
+				exit(status);
+		}
 
-			if (WEXITSTATUS(status) != 0) {
-				fprintf(stderr,
-				    "exit: %d\n\n",
-				    WEXITSTATUS(status));
-				if (halt == true)
-					exit(WEXITSTATUS(status));
-			}
-
-			ms_sleep(get_mscs(interval));
-			if (clear == true) {
-				clear_screen();
-				if (title == true)
-					draw_bar(interval, cmd);
-				fflush(stdout);
-			}
+		ms_sleep(get_mscs(interval));
+		if (clear == true) {
+			clear_screen();
+			if (title == true)
+				draw_bar(interval, cmd);
+			fflush(stdout);
 		}
 	}
 	return 0;
@@ -194,7 +176,7 @@ static void
 clear_screen(void)
 {
 	// copied from clear(1) command
-	fprintf(stdout, "\033[2J");
+	printf("\033[2J");
 }
 
 static void
