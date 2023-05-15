@@ -1,12 +1,29 @@
-#include <stdio.h>
+/*
+ * Copyright (c) 2023 ssleert <smnrbkv@proton.me>
+ *
+ * Permission to use, copy, modify, and distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */
+
 #include <stdlib.h>
+#include <stdio.h>
 #include <errno.h>
+#include <math.h>
 #include <float.h>
 #include <stdbool.h>
-#include <unistd.h>
 #include <string.h>
-#include <math.h>
 #include <time.h>
+#include <signal.h>
+#include <unistd.h>
 #include <sys/ioctl.h>
 
 #define BUFSIZE 2048
@@ -21,13 +38,12 @@
 	exit(status);                  \
 } while (0)
 
-#define revprint(str) do {                     \
-	printf("\033[%ldD", strlen(str) - 1);  \
-	printf("%s", str);                     \
-} while (0)
-
 static void usage(void);
+static void at_sigint();
 static void clear_screen(void);
+static void alt_screen(void);
+static void main_screen(void);
+static void revprint(const char *str);
 static void move_cursor(unsigned short x, unsigned short y);
 static void draw_bar(double interval, const char *cmd);
 static long get_mscs(double secs);
@@ -136,13 +152,18 @@ main(int argc, char *argv[])
 		error(4,
 		    "args: cmd arg starts with '-'\n");
 
-	if (clear == true) {
-		clear_screen();
-		if (title == true)
-			draw_bar(interval, cmd);
-		fflush(stdout);
-	}
+	signal(SIGINT, at_sigint);
+	atexit(main_screen);
+
+	alt_screen();
 	while (true) {
+		if (clear == true) {
+			clear_screen();
+			if (title == true)
+				draw_bar(interval, cmd);
+			fflush(stdout);
+		}
+
 		int status = system(cmd);
 		if (status != 0) {
 			fprintf(stderr,
@@ -153,14 +174,8 @@ main(int argc, char *argv[])
 		}
 
 		ms_sleep(get_mscs(interval));
-		if (clear == true) {
-			clear_screen();
-			if (title == true)
-				draw_bar(interval, cmd);
-			fflush(stdout);
-		}
 	}
-	return 0;
+	return EXIT_SUCCESS;
 }
 
 static void
@@ -170,6 +185,31 @@ usage(void)
 	    "usage: %s [-txsn:c:] -- [command ...]\n",
 	    getprogname());
 	exit(1);
+}
+
+static void 
+at_sigint()
+{
+	exit(0);
+}
+
+static void
+alt_screen(void) 
+{
+	printf("\033[?1049h");
+}
+
+static void
+main_screen(void)
+{
+	printf("\033[?1049l");
+}
+
+static void
+revprint(const char *str)
+{
+	printf("\033[%ldD", strlen(str) - 1);
+	printf("%s", str);
 }
 
 static void
@@ -190,7 +230,7 @@ draw_bar(double interval, const char *str)
 {
 	move_cursor(1, 1);
 
-	printf("Every %.3f: %s", interval, str);
+	printf("Every %0.3f: %s", interval, str);
 
 	struct winsize w;
 	ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);

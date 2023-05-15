@@ -2,9 +2,6 @@ CC	?= cc
 
 CFLAGS	?= -O2
 CFLAGS	+= -Wall -Wextra -std=c99 -pedantic
-#CFLAGS	+= -Wall -Wextra -Werror -std=c99 -pedantic
-#LDFLAGS	+= -ltermcap
-
 
 PREFIX	?= /usr/local
 BINDIR	?= $(PREFIX)/bin
