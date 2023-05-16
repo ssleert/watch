@@ -1,33 +1,10 @@
-CC	?= cc
-
-CFLAGS	?= -O2
-CFLAGS	+= -Wall -Wextra -std=c99 -pedantic
-
-PREFIX	?= /usr/local
-BINDIR	?= $(PREFIX)/bin
-MANDIR	?= $(PREFIX)/man/man1
-INSTALL	?= install -s
+# BSD Make makefile
 
 PROG	= watch
-MAN	= $(PROG).1
-CFILES	!= ls *.c 
-OBJS	= ${CFILES:.c=.o}
+SRCS	= watch.c
+MAN	= 
+CFLAGS	+= -Wall -Wextra -std=c99 -pedantic
 
-all: $(PROG)
 
-$(PROG): $(OBJS)
-	$(CC) $(OBJS) -o $@ $(LDFLAGS)
 
-%.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@ $(LDFLAGS)
-
-install: all
-	mkdir -p $(DESTDIR)$(BINDIR) $(DESTDIR)$(MANDIR)
-	$(INSTALL) $(PROG) $(DESTDIR)$(BINDIR)
-	$(INSTALL) -m 644 $(MAN) $(DESTDIR)$(MANDIR)/$(MAN)
-
-clean:
-	rm -f $(PROG) $(OBJS)
-
-.PHONY: all install clean
-
+.include <bsd.prog.mk>
