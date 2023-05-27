@@ -39,7 +39,7 @@
 } while (0)
 
 static void usage(void);
-static void at_sigint();
+static void at_sigint(int n);
 static void clear_screen(void);
 static void alt_screen(void);
 static void main_screen(void);
@@ -62,6 +62,7 @@ main(int argc, char *argv[])
 	bool title = true, halt = false, clear = true;
 
 	char ch;
+	size_t s;
 	while ((ch = getopt(argc, argv, "txsn:c:")) != -1) {
 		switch (ch) {
 		case 't':
@@ -96,8 +97,8 @@ main(int argc, char *argv[])
 				    interval);
 			break;
 		case 'c':
-			;size_t s = strlen(optarg) + 1;
-			cmd = malloc(s * sizeof(char));
+			s = strlen(optarg) + 1;
+			cmd = (char *)malloc(s * sizeof(char));
 			if (cmd == NULL)
 				error(3,
 				    "command: %s invalid (allocation failed)\n",
@@ -127,7 +128,7 @@ main(int argc, char *argv[])
 			    "args: no command after '--'\n");
 
 		size_t cmd_size = BUFSIZE;
-		cmd = malloc(cmd_size);
+		cmd = (char *)malloc(cmd_size);
 		if (cmd == NULL)
 			error(2,
 			    "command: failed to allocate space for cmd\n");
@@ -136,7 +137,7 @@ main(int argc, char *argv[])
 		for (int i = index; i < argc; ++i) {
 			if (cmd_size + strlen(argv[i]) + 1 >= cmd_size) {
 				cmd_size *= 2;
-				cmd = realloc(cmd, cmd_size);
+				cmd = (char *)realloc(cmd, cmd_size);
 				if (cmd == NULL)
 					error(2,
 					    "command: cmd_size = %ld (reallocation failed)\n",
@@ -152,8 +153,8 @@ main(int argc, char *argv[])
 		error(4,
 		    "args: cmd arg starts with '-'\n");
 
-	signal(SIGINT, at_sigint);
-	atexit(main_screen);
+	signal(SIGINT, &at_sigint);
+	atexit(&main_screen);
 
 	alt_screen();
 	while (true) {
@@ -188,9 +189,9 @@ usage(void)
 }
 
 static void 
-at_sigint()
+at_sigint(int n)
 {
-	exit(0);
+	exit(n);
 }
 
 static void
