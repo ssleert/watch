@@ -61,7 +61,7 @@ main(int argc, char *argv[])
 	double interval = DEFAULT_INTERVAL;
 	bool title = true, halt = false, clear = true;
 
-	char ch;
+	char ch, *endptr;
 	size_t s;
 	while ((ch = getopt(argc, argv, "txsn:c:")) != -1) {
 		switch (ch) {
@@ -75,8 +75,6 @@ main(int argc, char *argv[])
 			clear = false;
 			break;
 		case 'n':
-			;char *endptr;
-
 			interval = strtod(optarg, &endptr);
 			if (optarg == endptr)
 				error(2,
